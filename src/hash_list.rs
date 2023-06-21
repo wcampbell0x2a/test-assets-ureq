@@ -24,17 +24,17 @@ impl HashList {
     pub fn from_file(path: &str) -> Result<Self, TaError> {
         let rdr = File::open(path)?;
         let mut brdr = BufReader::new(rdr);
-        return Ok(HashList::from_reader(&mut brdr)?);
+        Self::from_reader(&mut brdr)
     }
 
     pub fn from_reader<T: BufRead>(brdr: &mut T) -> Result<Self, TaError> {
         let mut name_to_hash_map = HashMap::new();
         for oline in brdr.lines() {
             let line = oline?;
-            if line.starts_with("#") {
+            if line.starts_with('#') {
                 continue;
             }
-            let mut spi = line.split(" ");
+            let mut spi = line.split(' ');
             let hash_str = match spi.next() {
                 Some(v) => v,
                 None => continue,
@@ -46,7 +46,7 @@ impl HashList {
             };
             name_to_hash_map.insert(name.to_owned(), hash);
         }
-        return Ok(HashList { name_to_hash_map });
+        Ok(Self { name_to_hash_map })
     }
 
     pub fn to_file(&self, path: &str) -> Result<(), TaError> {
@@ -63,9 +63,9 @@ impl HashList {
     }
 
     pub fn new() -> Self {
-        return HashList {
+        Self {
             name_to_hash_map: HashMap::new(),
-        };
+        }
     }
 
     pub fn get_hash<'a>(&'a self, filename: &str) -> Option<&'a Sha256Hash> {

@@ -5,7 +5,6 @@
 // attached to this source distribution for details.
 
 #![forbid(unsafe_code)]
-#![cfg_attr(test, deny(warnings))]
 
 /*!
 Download test assets, managing them outside of git.
@@ -44,17 +43,14 @@ If you have run the test once, it will re-use the files
 instead of re-downloading them.
 */
 
-extern crate curl;
-extern crate sha2;
-
 mod hash_list;
 
-use curl::easy::Easy;
 use hash_list::HashList;
 use sha2::digest::Digest;
 use sha2::Sha256;
 use std::fs::{create_dir_all, File};
 use std::io::{self, Write};
+use ureq::Agent;
 
 /// Definition for a test file
 ///
@@ -75,15 +71,15 @@ pub struct TestAssetDef {
 pub struct Sha256Hash([u8; 32]);
 
 impl Sha256Hash {
-    pub fn from_digest(sha: Sha256) -> Self {
+    #[must_use] pub fn from_digest(sha: Sha256) -> Self {
         let sha = sha.finalize();
         let bytes = sha[..].try_into().unwrap();
-        Sha256Hash(bytes)
+        Self(bytes)
     }
 
     /// Converts the hexadecimal string to a hash value
     pub fn from_hex(s: &str) -> Result<Self, ()> {
-        let mut res = Sha256Hash([0; 32]);
+        let mut res = Self([0; 32]);
         let mut idx = 0;
         let mut iter = s.chars();
         loop {
@@ -101,84 +97,83 @@ impl Sha256Hash {
                 break;
             }
         }
-        return Ok(res);
+        Ok(res)
     }
     /// Converts the hash value to hexadecimal
-    pub fn to_hex(&self) -> String {
+    #[must_use] pub fn to_hex(&self) -> String {
         let mut res = String::with_capacity(64);
-        for v in self.0.iter() {
+        for v in &self.0 {
             use std::char::from_digit;
-            res.push(from_digit(*v as u32 >> 4, 16).unwrap());
-            res.push(from_digit(*v as u32 & 15, 16).unwrap());
+            res.push(from_digit(u32::from(*v) >> 4, 16).unwrap());
+            res.push(from_digit(u32::from(*v) & 15, 16).unwrap());
         }
-        return res;
+        res
     }
 }
 
 #[derive(Debug)]
 pub enum TaError {
     Io(io::Error),
-    Curl(curl::Error),
-    DownloadFailed(u32),
+    DownloadFailed,
     BadHashFormat,
 }
 
 impl From<io::Error> for TaError {
-    fn from(err: io::Error) -> TaError {
-        TaError::Io(err)
-    }
-}
-
-impl From<curl::Error> for TaError {
-    fn from(err: curl::Error) -> TaError {
-        TaError::Curl(err)
+    fn from(err: io::Error) -> Self {
+        Self::Io(err)
     }
 }
 
 enum DownloadOutcome {
     WithHash(Sha256Hash),
-    DownloadFailed(u32),
 }
 
 fn download_test_file(
-    client: &mut Easy,
+    agent: &mut Agent,
     tfile: &TestAssetDef,
     dir: &str,
 ) -> Result<DownloadOutcome, TaError> {
-    client.url(&tfile.url)?;
-    let mut content = Vec::new();
-
+    dbg!(&tfile.url);
+    let resp = match agent
+        .get(&tfile.url)
+        .timeout(std::time::Duration::from_secs(300))
+        .call()
     {
-        let mut transfer = client.transfer();
-        transfer.write_function(|data| {
-            content.extend_from_slice(data);
-            Ok(data.len())
-        })?;
-        transfer.perform()?;
+        Ok(resp) => resp,
+        Err(e) => {
+            println!("{e:?}");
+            return Err(TaError::DownloadFailed);
+        }
+    };
+
+    let len = resp
+        .header("Content-Length")
+        .and_then(|s| s.parse::<usize>().ok())
+        .unwrap();
+    let mut reader = resp.into_reader();
+    let mut buffer = vec![];
+    let read_len = reader.read_to_end(&mut buffer).unwrap();
+    if (buffer.len() != read_len) && (buffer.len() != len) {
+        return Err(TaError::DownloadFailed);
     }
+
+    let file = File::create(format!("{}/{}", dir, tfile.filename))?;
+    let mut writer = io::BufWriter::new(file);
+    writer.write_all(&buffer).unwrap();
 
     let mut hasher = Sha256::new();
-    let mut file = File::create(format!("{}/{}", dir, tfile.filename))?;
-    file.write_all(&content)?;
-    hasher.update(&content);
+    hasher.update(&buffer);
 
-    let response_code = client.response_code()?;
-    if response_code < 200 || response_code > 399 {
-        return Ok(DownloadOutcome::DownloadFailed(response_code));
-    }
-    return Ok(DownloadOutcome::WithHash(Sha256Hash::from_digest(
-        hasher,
-    )));
+    Ok(DownloadOutcome::WithHash(Sha256Hash::from_digest(hasher)))
 }
 
 /// Downloads the test files into the passed directory.
 pub fn download_test_files(defs: &[TestAssetDef], dir: &str, verbose: bool) -> Result<(), TaError> {
-    let mut client = Easy::new();
-    client.follow_location(true)?;
+    let mut agent = ureq::agent();
 
     use std::io::ErrorKind;
 
-    let hash_list_path = format!("{}/hash_list", dir);
+    let hash_list_path = format!("{dir}/hash_list");
     let mut hash_list = match HashList::from_file(&hash_list_path) {
         Ok(l) => l,
         Err(TaError::Io(ref e)) if e.kind() == ErrorKind::NotFound => HashList::new(),
@@ -192,8 +187,7 @@ pub fn download_test_files(defs: &[TestAssetDef], dir: &str, verbose: bool) -> R
         let tfile_hash = Sha256Hash::from_hex(&tfile.hash).map_err(|_| TaError::BadHashFormat)?;
         if hash_list
             .get_hash(&tfile.filename)
-            .map(|h| h == &tfile_hash)
-            .unwrap_or(false)
+            .map_or(false, |h| h == &tfile_hash)
         {
             // Hash match
             if verbose {
@@ -207,17 +201,14 @@ pub fn download_test_files(defs: &[TestAssetDef], dir: &str, verbose: bool) -> R
         if verbose {
             print!("Fetching file {} ...", tfile.filename);
         }
-        let outcome = download_test_file(&mut client, tfile, dir)?;
-        use self::DownloadOutcome::*;
-        match &outcome {
-            &DownloadFailed(code) => return Err(TaError::DownloadFailed(code)),
-            &WithHash(ref hash) => hash_list.add_entry(&tfile.filename, hash),
+        let outcome = download_test_file(&mut agent, tfile, dir)?;
+        match outcome {
+            DownloadOutcome::WithHash(ref hash) => hash_list.add_entry(&tfile.filename, hash),
         }
         if verbose {
             print!("  => ");
-            match &outcome {
-                &DownloadFailed(code) => println!("Download failed with code {}", code),
-                &WithHash(ref found_hash) => {
+            match outcome {
+                DownloadOutcome::WithHash(ref found_hash) => {
                     if found_hash == &tfile_hash {
                         println!("Success")
                     } else {
