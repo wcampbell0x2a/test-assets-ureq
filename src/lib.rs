@@ -115,6 +115,7 @@ impl Sha256Hash {
 pub enum TaError {
     Io(io::Error),
     DownloadFailed,
+    HashMismatch(String, String),
     BadHashFormat,
 }
 
@@ -207,17 +208,19 @@ pub fn download_test_files(defs: &[TestAssetDef], dir: &str, verbose: bool) -> R
         }
         if verbose {
             print!("  => ");
-            match outcome {
-                DownloadOutcome::WithHash(ref found_hash) => {
-                    if found_hash == &tfile_hash {
+        }
+        match outcome {
+            DownloadOutcome::WithHash(ref found_hash) => {
+                if found_hash == &tfile_hash {
+                    if verbose {
                         println!("Success")
-                    } else {
-                        println!(
-                            "Hash mismatch: found {}, expected {}",
-                            found_hash.to_hex(),
-                            tfile.hash
-                        )
                     }
+                } else {
+                    // if the hash mismatches after download, return error
+                    return Err(TaError::HashMismatch(
+                        found_hash.to_hex(),
+                        tfile.hash.clone(),
+                    ));
                 }
             }
         }
