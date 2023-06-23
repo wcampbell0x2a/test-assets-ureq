@@ -49,7 +49,7 @@ use hash_list::HashList;
 use sha2::digest::Digest;
 use sha2::Sha256;
 use std::fs::{create_dir_all, File};
-use std::io::{self, Write};
+use std::io::{self, Read, Write};
 use ureq::Agent;
 
 /// Definition for a test file
@@ -135,11 +135,7 @@ fn download_test_file(
     dir: &str,
 ) -> Result<DownloadOutcome, TaError> {
     dbg!(&tfile.url);
-    let resp = match agent
-        .get(&tfile.url)
-        .timeout(std::time::Duration::from_secs(300))
-        .call()
-    {
+    let resp = match agent.get(&tfile.url).call() {
         Ok(resp) => resp,
         Err(e) => {
             println!("{e:?}");
@@ -147,23 +143,24 @@ fn download_test_file(
         }
     };
 
-    let len = resp
-        .header("Content-Length")
-        .and_then(|s| s.parse::<usize>().ok())
-        .unwrap();
-    let mut reader = resp.into_reader();
-    let mut buffer = vec![];
-    let read_len = reader.read_to_end(&mut buffer).unwrap();
-    if (buffer.len() != read_len) && (buffer.len() != len) {
+    let len: usize = resp.header("Content-Length").unwrap().parse().unwrap();
+
+    let mut bytes: Vec<u8> = Vec::with_capacity(len);
+    let read_len = resp
+        .into_reader()
+        .take(10_000_000_000)
+        .read_to_end(&mut bytes)?;
+
+    if (bytes.len() != read_len) && (bytes.len() != len) {
         return Err(TaError::DownloadFailed);
     }
 
     let file = File::create(format!("{}/{}", dir, tfile.filename))?;
     let mut writer = io::BufWriter::new(file);
-    writer.write_all(&buffer).unwrap();
+    writer.write_all(&bytes).unwrap();
 
     let mut hasher = Sha256::new();
-    hasher.update(&buffer);
+    hasher.update(&bytes);
 
     Ok(DownloadOutcome::WithHash(Sha256Hash::from_digest(hasher)))
 }
