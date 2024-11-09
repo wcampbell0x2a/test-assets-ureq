@@ -8,7 +8,7 @@ out of VCS and don't make them bloat your repository.
 
 Usage example:
 
-```
+```rust, no_run
 #[test]
 fn some_awesome_test() {
     let asset_defs = [
@@ -73,7 +73,7 @@ impl Sha256Hash {
     }
 
     /// Converts the hexadecimal string to a hash value
-    pub fn from_hex(s: &str) -> Result<Self, ()> {
+    fn from_hex(s: &str) -> Result<Self, ()> {
         let mut res = Self([0; 32]);
         let mut idx = 0;
         let mut iter = s.chars();
@@ -221,7 +221,7 @@ pub fn dl_test_files_backoff(
 ) -> Result<(), TaError> {
     let strategy = ExponentialBuilder::default().with_max_delay(max_delay);
 
-    let _ = (|| dl_test_files(assets_defs, test_path, verbose)).retry(strategy).call().unwrap();
+    (|| dl_test_files(assets_defs, test_path, verbose)).retry(strategy).call().unwrap();
 
     Ok(())
 }

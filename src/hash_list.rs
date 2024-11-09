@@ -57,7 +57,7 @@ impl HashList {
 
     pub fn to_writer<W: Write>(&self, bwrtr: &mut BufWriter<W>) -> Result<(), TaError> {
         for (name, hash) in &self.name_to_hash_map {
-            bwrtr.write(format!("{} {}\n", hash.to_hex(), name).as_bytes())?;
+            bwrtr.write_all(format!("{} {}\n", hash.to_hex(), name).as_bytes())?;
         }
         Ok(())
     }
