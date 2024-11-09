@@ -63,9 +63,7 @@ impl HashList {
     }
 
     pub fn new() -> Self {
-        Self {
-            name_to_hash_map: HashMap::new(),
-        }
+        Self { name_to_hash_map: HashMap::new() }
     }
 
     pub fn get_hash<'a>(&'a self, filename: &str) -> Option<&'a Sha256Hash> {
@@ -73,7 +71,6 @@ impl HashList {
     }
 
     pub fn add_entry(&mut self, filename: &str, hash: &Sha256Hash) {
-        self.name_to_hash_map
-            .insert(filename.to_owned(), hash.clone());
+        self.name_to_hash_map.insert(filename.to_owned(), hash.clone());
     }
 }

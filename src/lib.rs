@@ -1,17 +1,8 @@
-// Copyright (c) 2016 est31 <MTest31@outlook.com>
-// and contributors. All rights reserved.
-// Licensed under MIT license, or Apache 2 license,
-// at your option. Please see the LICENSE file
-// attached to this source distribution for details.
-
-#![forbid(unsafe_code)]
-
 /*!
-Download test assets, managing them outside of git.
+Download test assets, managing them outside of git
 
 This library downloads test assets using http(s),
 and ensures integrity by comparing those assets to a hash.
-
 By managing the download separately, you can keep them
 out of VCS and don't make them bloat your repository.
 
@@ -32,7 +23,7 @@ fn some_awesome_test() {
             url : format!("https://url/to/a.png"),
         },
     ];
-    test_assets::download_test_files(&asset_defs,
+    test_assets::dl_test_files(&asset_defs,
         "test-assets", true).unwrap();
     // use your files here
     // with path under test-assets/file_a.png and test-assets/file_b.png
@@ -45,11 +36,14 @@ instead of re-downloading them.
 
 mod hash_list;
 
+use backon::BlockingRetryable;
+use backon::ExponentialBuilder;
 use hash_list::HashList;
 use sha2::digest::Digest;
 use sha2::Sha256;
 use std::fs::{create_dir_all, File};
 use std::io::{self, Read, Write};
+use std::time::Duration;
 use ureq::Agent;
 
 /// Definition for a test file
@@ -71,7 +65,8 @@ pub struct TestAssetDef {
 pub struct Sha256Hash([u8; 32]);
 
 impl Sha256Hash {
-    #[must_use] pub fn from_digest(sha: Sha256) -> Self {
+    #[must_use]
+    pub fn from_digest(sha: Sha256) -> Self {
         let sha = sha.finalize();
         let bytes = sha[..].try_into().unwrap();
         Self(bytes)
@@ -100,7 +95,8 @@ impl Sha256Hash {
         Ok(res)
     }
     /// Converts the hash value to hexadecimal
-    #[must_use] pub fn to_hex(&self) -> String {
+    #[must_use]
+    pub fn to_hex(&self) -> String {
         let mut res = String::with_capacity(64);
         for v in &self.0 {
             use std::char::from_digit;
@@ -134,7 +130,6 @@ fn download_test_file(
     tfile: &TestAssetDef,
     dir: &str,
 ) -> Result<DownloadOutcome, TaError> {
-    dbg!(&tfile.url);
     let resp = match agent.get(&tfile.url).call() {
         Ok(resp) => resp,
         Err(e) => {
@@ -146,10 +141,7 @@ fn download_test_file(
     let len: usize = resp.header("Content-Length").unwrap().parse().unwrap();
 
     let mut bytes: Vec<u8> = Vec::with_capacity(len);
-    let read_len = resp
-        .into_reader()
-        .take(10_000_000_000)
-        .read_to_end(&mut bytes)?;
+    let read_len = resp.into_reader().take(10_000_000_000).read_to_end(&mut bytes)?;
 
     if (bytes.len() != read_len) && (bytes.len() != len) {
         return Err(TaError::DownloadFailed);
@@ -166,7 +158,7 @@ fn download_test_file(
 }
 
 /// Downloads the test files into the passed directory.
-pub fn download_test_files(defs: &[TestAssetDef], dir: &str, verbose: bool) -> Result<(), TaError> {
+pub fn dl_test_files(defs: &[TestAssetDef], dir: &str, verbose: bool) -> Result<(), TaError> {
     let mut agent = ureq::agent();
 
     use std::io::ErrorKind;
@@ -183,10 +175,7 @@ pub fn download_test_files(defs: &[TestAssetDef], dir: &str, verbose: bool) -> R
     create_dir_all(dir)?;
     for tfile in defs.iter() {
         let tfile_hash = Sha256Hash::from_hex(&tfile.hash).map_err(|_| TaError::BadHashFormat)?;
-        if hash_list
-            .get_hash(&tfile.filename)
-            .map_or(false, |h| h == &tfile_hash)
-        {
+        if hash_list.get_hash(&tfile.filename).map_or(false, |h| h == &tfile_hash) {
             // Hash match
             if verbose {
                 println!(
@@ -214,14 +203,25 @@ pub fn download_test_files(defs: &[TestAssetDef], dir: &str, verbose: bool) -> R
                     }
                 } else {
                     // if the hash mismatches after download, return error
-                    return Err(TaError::HashMismatch(
-                        found_hash.to_hex(),
-                        tfile.hash.clone(),
-                    ));
+                    return Err(TaError::HashMismatch(found_hash.to_hex(), tfile.hash.clone()));
                 }
             }
         }
     }
     hash_list.to_file(&hash_list_path)?;
+    Ok(())
+}
+
+/// Download test-assets with backoff retries
+pub fn dl_test_files_backoff(
+    assets_defs: &[TestAssetDef],
+    test_path: &str,
+    verbose: bool,
+    max_delay: Duration,
+) -> Result<(), TaError> {
+    let strategy = ExponentialBuilder::default().with_max_delay(max_delay);
+
+    let _ = (|| dl_test_files(assets_defs, test_path, verbose)).retry(strategy).call().unwrap();
+
     Ok(())
 }

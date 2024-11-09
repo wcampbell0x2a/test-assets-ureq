@@ -1,14 +1,15 @@
 [package]
-name = "test-assets"
-version = "0.2.0"
+name = "test-assets-ureq"
+version = "0.3.0"
 license = "MIT/Apache-2.0"
-description = "Download test assets, managing them outside of git"
-documentation = "https://docs.rs/test-assets/"
-repository = "https://github.com/est31/test-assets"
+description = "Download test assets with ureq, managing them outside of git"
+documentation = "https://docs.rs/test-assets-ureq/"
+repository = "https://github.com/wcampbell0x2a/test-assets-ureq"
 readme = "README.md"
 authors = ["est31 <MTest31@outlook.com>"]
 edition = "2021"
 
 [dependencies]
 sha2 = "0.10.6"
+backon = "1.2.0"
 ureq = "2.7.1"
