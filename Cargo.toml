@@ -6,7 +6,6 @@ description = "Download test assets with ureq, managing them outside of git"
 documentation = "https://docs.rs/test-assets-ureq/"
 repository = "https://github.com/wcampbell0x2a/test-assets-ureq"
 readme = "README.md"
-authors = ["est31 <MTest31@outlook.com>"]
 edition = "2021"
 
 [dependencies]
