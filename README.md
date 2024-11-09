@@ -11,4 +11,11 @@ Changes from being a fork of [test-assets](https://github.com/est31/test-assets)
 * Use rust library `ureq` and avoid compiling curl for test binaries
 * Includes backoff support
 
+## Library
 *Compiler support: requires rustc 1.70.0+*
+
+Add the following to your `Cargo.toml` file:
+```toml
+[dependencies]
+test-assets-ureq = "0.3.0"
+```
