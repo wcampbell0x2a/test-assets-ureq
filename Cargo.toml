@@ -13,3 +13,6 @@ rust-version = "1.70"
 sha2 = "0.10.6"
 backon = "1.2.0"
 ureq = "2.7.1"
+toml = "0.8.19"
+serde = { version = "1.0.215", features = ["derive"] }
+clap = { version = "4.4.18", features = ["derive"] }
