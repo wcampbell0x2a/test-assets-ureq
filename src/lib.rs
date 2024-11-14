@@ -39,6 +39,7 @@ mod hash_list;
 use backon::BlockingRetryable;
 use backon::ExponentialBuilder;
 use hash_list::HashList;
+use serde::Deserialize;
 use sha2::digest::Digest;
 use sha2::Sha256;
 use std::fs::{create_dir_all, File};
@@ -46,9 +47,22 @@ use std::io::{self, Read, Write};
 use std::time::Duration;
 use ureq::Agent;
 
+#[derive(Debug, Deserialize)]
+pub struct TestAsset {
+    #[serde(rename = "test_assets")]
+    pub assets: std::collections::BTreeMap<String, TestAssetDef>,
+}
+
+impl TestAsset {
+    pub fn values(&self) -> Vec<TestAssetDef> {
+        self.assets.values().cloned().collect()
+    }
+}
+
 /// Definition for a test file
 ///
 ///
+#[derive(Debug, Deserialize, Clone)]
 pub struct TestAssetDef {
     /// Name of the file on disk. This should be unique for the file.
     pub filename: String,
