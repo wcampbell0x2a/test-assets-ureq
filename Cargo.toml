@@ -12,4 +12,4 @@ rust-version = "1.70"
 [dependencies]
 sha2 = "0.10.6"
 backon = "1.2.0"
-ureq = "2.7.1"
+ureq = "2.12.1"
