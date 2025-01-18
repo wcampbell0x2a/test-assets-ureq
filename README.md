@@ -12,7 +12,7 @@ Changes from being a fork of [test-assets](https://github.com/est31/test-assets)
 * Includes backoff support
 
 ## Library
-*Compiler support: requires rustc 1.70.0+*
+*Compiler support: requires rustc 1.74.1+*
 
 Add the following to your `Cargo.toml` file:
 ```toml
