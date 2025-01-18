@@ -189,7 +189,7 @@ pub fn dl_test_files(defs: &[TestAssetDef], dir: &str, verbose: bool) -> Result<
     create_dir_all(dir)?;
     for tfile in defs.iter() {
         let tfile_hash = Sha256Hash::from_hex(&tfile.hash).map_err(|_| TaError::BadHashFormat)?;
-        if hash_list.get_hash(&tfile.filename).map_or(false, |h| h == &tfile_hash) {
+        if hash_list.get_hash(&tfile.filename) == Some(&tfile_hash) {
             // Hash match
             if verbose {
                 println!(
