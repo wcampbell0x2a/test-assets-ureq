@@ -17,7 +17,7 @@ Changes from being a fork of [test-assets](https://github.com/est31/test-assets)
 Add the following to your `Cargo.toml` file:
 ```toml
 [dependencies]
-test-assets-ureq = "0.3.0"
+test-assets-ureq = "0.5.0"
 ```
 
 For example, add the following information into the project `toml` file.
@@ -39,6 +39,6 @@ dl_test_files_backoff(&assets, "test-assets", true, Duration::from_secs(1)).unwr
 ## Binary
 If test-assets are needed outside of the Rust code, a binary is provided to download them.
 ```console
-$ curl -L https://github.com/wcampbell0x2a/test-assets-ureq/releases/download/v0.4.0/dl-v0.4.0-x86_64-unknown-linux-musl.tar.gz -o dl
+$ curl -L https://github.com/wcampbell0x2a/test-assets-ureq/releases/download/v0.5.0/dl-v0.5.0-x86_64-unknown-linux-musl.tar.gz -o dl
 $ ./dl test-assets.toml
 ```

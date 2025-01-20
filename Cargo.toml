@@ -1,6 +1,6 @@
 [package]
 name = "test-assets-ureq"
-version = "0.4.0"
+version = "0.5.0"
 license = "MIT/Apache-2.0"
 description = "Download test assets with ureq, managing them outside of git"
 documentation = "https://docs.rs/test-assets-ureq/"
