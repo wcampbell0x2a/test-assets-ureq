@@ -39,6 +39,7 @@ mod hash_list;
 use backon::BlockingRetryable;
 use backon::ExponentialBuilder;
 use hash_list::HashList;
+use serde::Deserialize;
 use sha2::digest::Digest;
 use sha2::Sha256;
 use std::fs::{create_dir_all, File};
@@ -46,9 +47,22 @@ use std::io::{self, Read, Write};
 use std::time::Duration;
 use ureq::Agent;
 
+#[derive(Debug, Deserialize)]
+pub struct TestAsset {
+    #[serde(rename = "test_assets")]
+    pub assets: std::collections::BTreeMap<String, TestAssetDef>,
+}
+
+impl TestAsset {
+    pub fn values(&self) -> Vec<TestAssetDef> {
+        self.assets.values().cloned().collect()
+    }
+}
+
 /// Definition for a test file
 ///
 ///
+#[derive(Debug, Deserialize, Clone)]
 pub struct TestAssetDef {
     /// Name of the file on disk. This should be unique for the file.
     pub filename: String,
@@ -175,7 +189,7 @@ pub fn dl_test_files(defs: &[TestAssetDef], dir: &str, verbose: bool) -> Result<
     create_dir_all(dir)?;
     for tfile in defs.iter() {
         let tfile_hash = Sha256Hash::from_hex(&tfile.hash).map_err(|_| TaError::BadHashFormat)?;
-        if hash_list.get_hash(&tfile.filename).map_or(false, |h| h == &tfile_hash) {
+        if hash_list.get_hash(&tfile.filename) == Some(&tfile_hash) {
             // Hash match
             if verbose {
                 println!(

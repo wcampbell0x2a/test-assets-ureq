@@ -12,10 +12,33 @@ Changes from being a fork of [test-assets](https://github.com/est31/test-assets)
 * Includes backoff support
 
 ## Library
-*Compiler support: requires rustc 1.70.0+*
+*Compiler support: requires rustc 1.74.1+*
 
 Add the following to your `Cargo.toml` file:
 ```toml
 [dependencies]
 test-assets-ureq = "0.3.0"
+```
+
+For example, add the following information into the project `toml` file.
+```toml
+[test_assets.test_00]
+filename = "out.squashfs"
+hash = "976c1638d8c1ba8014de6c64b196cbd70a5acf031be10a8e7f649536193c8e78"
+url = "https://wcampbell.dev/squashfs/testing/test_00/out.squashfs"
+```
+
+In your rust code, add the following to download using that previous file.
+```rust,no_run
+let file_content = fs::read_to_string("test.toml").unwrap();
+let parsed: TestAsset = toml::de::from_str(&file_content).unwrap();
+let assets = parsed.values();
+dl_test_files_backoff(&assets, "test-assets", true, Duration::from_secs(1)).unwrap();
+```
+
+## Binary
+If test-assets are needed outside of the Rust code, a binary is provided to download them.
+```console
+$ curl -L https://github.com/wcampbell0x2a/test-assets-ureq/releases/download/v0.4.0/dl-v0.4.0-x86_64-unknown-linux-musl.tar.gz -o dl
+$ ./dl test-assets.toml
 ```
