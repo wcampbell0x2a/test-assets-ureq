@@ -12,6 +12,10 @@ struct Cli {
     /// Base path to write downloaded files
     #[arg(value_name = "PATH")]
     out: String,
+
+    /// Only grab matching test names
+    #[arg(long)]
+    filter: Option<String>,
 }
 
 fn main() {
@@ -20,6 +24,5 @@ fn main() {
     let file_content = fs::read_to_string(&cli.file).unwrap();
 
     let parsed: TestAsset = toml::de::from_str(&file_content).unwrap();
-    let assets = parsed.values();
-    dl_test_files_backoff(&assets, &cli.out, true, Duration::from_secs(1)).unwrap();
+    dl_test_files_backoff(&parsed, &cli.filter, &cli.out, true, Duration::from_secs(1)).unwrap();
 }

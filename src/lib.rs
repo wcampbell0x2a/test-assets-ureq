@@ -23,8 +23,7 @@ fn some_awesome_test() {
             url : format!("https://url/to/a.png"),
         },
     ];
-    test_assets::dl_test_files(&asset_defs,
-        "test-assets", true).unwrap();
+    test_assets::dl_test_files(&asset_defs, None, "test-assets", true).unwrap();
     // use your files here
     // with path under test-assets/file_a.png and test-assets/file_b.png
 }
@@ -42,15 +41,17 @@ use hash_list::HashList;
 use serde::Deserialize;
 use sha2::digest::Digest;
 use sha2::Sha256;
+use std::collections::BTreeMap;
 use std::fs::{create_dir_all, File};
+use std::io::ErrorKind;
 use std::io::{self, Read, Write};
 use std::time::Duration;
 use ureq::Agent;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct TestAsset {
     #[serde(rename = "test_assets")]
-    pub assets: std::collections::BTreeMap<String, TestAssetDef>,
+    pub assets: BTreeMap<String, TestAssetDef>,
 }
 
 impl TestAsset {
@@ -141,10 +142,11 @@ enum DownloadOutcome {
 
 fn download_test_file(
     agent: &mut Agent,
-    tfile: &TestAssetDef,
+    test_asset: &TestAssetDef,
+    test_name: &str,
     dir: &str,
 ) -> Result<DownloadOutcome, TaError> {
-    let resp = match agent.get(&tfile.url).call() {
+    let resp = match agent.get(&test_asset.url).call() {
         Ok(resp) => resp,
         Err(e) => {
             println!("{e:?}");
@@ -161,7 +163,7 @@ fn download_test_file(
         return Err(TaError::DownloadFailed);
     }
 
-    let file = File::create(format!("{}/{}", dir, tfile.filename))?;
+    let file = File::create(format!("{dir}/{test_name}/{}", test_asset.filename))?;
     let mut writer = io::BufWriter::new(file);
     writer.write_all(&bytes).unwrap();
 
@@ -172,10 +174,13 @@ fn download_test_file(
 }
 
 /// Downloads the test files into the passed directory.
-pub fn dl_test_files(defs: &[TestAssetDef], dir: &str, verbose: bool) -> Result<(), TaError> {
+pub fn dl_test_files(
+    test_asset: &TestAsset,
+    filter: &Option<String>,
+    dir: &str,
+    verbose: bool,
+) -> Result<(), TaError> {
     let mut agent = ureq::agent();
-
-    use std::io::ErrorKind;
 
     let hash_list_path = format!("{dir}/hash_list");
     let mut hash_list = match HashList::from_file(&hash_list_path) {
@@ -186,8 +191,16 @@ pub fn dl_test_files(defs: &[TestAssetDef], dir: &str, verbose: bool) -> Result<
             unreachable!()
         }
     };
+
     create_dir_all(dir)?;
-    for tfile in defs.iter() {
+    for (key, tfile) in test_asset.assets.iter() {
+        // if a filter is provided, check if the key matches
+        if let Some(filter) = &filter {
+            if key != filter {
+                continue;
+            }
+        }
+        create_dir_all(format!("{dir}/{key}"))?;
         let tfile_hash = Sha256Hash::from_hex(&tfile.hash).map_err(|_| TaError::BadHashFormat)?;
         if hash_list.get_hash(&tfile.filename) == Some(&tfile_hash) {
             // Hash match
@@ -202,7 +215,7 @@ pub fn dl_test_files(defs: &[TestAssetDef], dir: &str, verbose: bool) -> Result<
         if verbose {
             println!("Fetching file {} ...", tfile.filename);
         }
-        let outcome = download_test_file(&mut agent, tfile, dir)?;
+        let outcome = download_test_file(&mut agent, tfile, key, dir)?;
         match outcome {
             DownloadOutcome::WithHash(ref hash) => hash_list.add_entry(&tfile.filename, hash),
         }
@@ -228,14 +241,15 @@ pub fn dl_test_files(defs: &[TestAssetDef], dir: &str, verbose: bool) -> Result<
 
 /// Download test-assets with backoff retries
 pub fn dl_test_files_backoff(
-    assets_defs: &[TestAssetDef],
+    test_asset: &TestAsset,
+    filter: &Option<String>,
     test_path: &str,
     verbose: bool,
     max_delay: Duration,
 ) -> Result<(), TaError> {
     let strategy = ExponentialBuilder::default().with_max_delay(max_delay);
 
-    (|| dl_test_files(assets_defs, test_path, verbose)).retry(strategy).call().unwrap();
+    (|| dl_test_files(test_asset, filter, test_path, verbose)).retry(strategy).call().unwrap();
 
     Ok(())
 }
