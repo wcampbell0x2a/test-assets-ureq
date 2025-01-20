@@ -200,7 +200,7 @@ pub fn dl_test_files(defs: &[TestAssetDef], dir: &str, verbose: bool) -> Result<
             continue;
         }
         if verbose {
-            print!("Fetching file {} ...", tfile.filename);
+            println!("Fetching file {} ...", tfile.filename);
         }
         let outcome = download_test_file(&mut agent, tfile, dir)?;
         match outcome {
