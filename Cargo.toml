@@ -8,6 +8,8 @@ repository = "https://github.com/wcampbell0x2a/test-assets-ureq"
 readme = "README.md"
 edition = "2021"
 rust-version = "1.74.1"
+categories = ["development-tools"]
+keywords = ["test", "assets", "download",  "https", "toml"]
 
 [dependencies]
 sha2 = "0.10.6"
