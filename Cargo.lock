@@ -715,7 +715,7 @@ dependencies = [
 
 [[package]]
 name = "test-assets-ureq"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "backon",
  "clap",
