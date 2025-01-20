@@ -39,6 +39,7 @@ dl_test_files_backoff(&assets, "test-assets", true, Duration::from_secs(1)).unwr
 ## Binary
 If test-assets are needed outside of the Rust code, a binary is provided to download them.
 ```console
-$ curl -L https://github.com/wcampbell0x2a/test-assets-ureq/releases/download/v0.5.0/dl-v0.5.0-x86_64-unknown-linux-musl.tar.gz -o dl
+$ curl -L https://github.com/wcampbell0x2a/test-assets-ureq/releases/download/v0.5.0/dl-v0.5.0-x86_64-unknown-linux-musl.tar.gz -o dl.tar.gz
+$ tar -xvf dl.tar.gz
 $ ./dl test-assets.toml
 ```
