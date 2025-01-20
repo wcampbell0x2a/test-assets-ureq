@@ -8,6 +8,10 @@ struct Cli {
     /// Path to the TOML file to read
     #[arg(value_name = "FILE")]
     file: String,
+
+    /// Base path to write downloaded files
+    #[arg(value_name = "PATH")]
+    out: String,
 }
 
 fn main() {
@@ -17,5 +21,5 @@ fn main() {
 
     let parsed: TestAsset = toml::de::from_str(&file_content).unwrap();
     let assets = parsed.values();
-    dl_test_files_backoff(&assets, "test-assets", true, Duration::from_secs(1)).unwrap();
+    dl_test_files_backoff(&assets, &cli.out, true, Duration::from_secs(1)).unwrap();
 }
