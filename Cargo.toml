@@ -19,6 +19,9 @@ toml = "0.8.19"
 serde = { version = "1.0.215", features = ["derive"] }
 clap = { version = "4.4.18", features = ["derive"] }
 
+[dev-dependencies]
+rstest = "0.23"
+
 # Release(dist) binaries are setup for maximum runtime speed, at the cost of CI time
 [profile.dist]
 inherits = "release"
