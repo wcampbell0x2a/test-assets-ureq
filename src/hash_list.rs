@@ -21,12 +21,14 @@ pub struct HashList {
 }
 
 impl HashList {
+    /// Load hash list from a file
     pub fn from_file(path: &str) -> Result<Self, TaError> {
         let rdr = File::open(path)?;
         let mut brdr = BufReader::new(rdr);
         Self::from_reader(&mut brdr)
     }
 
+    /// Load hash list from a reader
     pub fn from_reader<T: BufRead>(brdr: &mut T) -> Result<Self, TaError> {
         let mut name_to_hash_map = HashMap::new();
         for oline in brdr.lines() {
@@ -35,26 +37,26 @@ impl HashList {
                 continue;
             }
             let mut spi = line.split(' ');
-            let hash_str = match spi.next() {
-                Some(v) => v,
-                None => continue,
+            let Some(hash_str) = spi.next() else {
+                continue;
             };
-            let hash = Sha256Hash::from_hex(hash_str).map_err(|_| TaError::BadHashFormat)?;
-            let name = match spi.next() {
-                Some(v) => v,
-                None => continue,
+            let hash = Sha256Hash::from_hex(hash_str).map_err(|()| TaError::BadHashFormat)?;
+            let Some(name) = spi.next() else {
+                continue;
             };
             name_to_hash_map.insert(name.to_owned(), hash);
         }
         Ok(Self { name_to_hash_map })
     }
 
+    /// Save hash list to a file
     pub fn to_file(&self, path: &str) -> Result<(), TaError> {
         let wrt = File::create(path)?;
         let mut bwrtr = BufWriter::new(wrt);
         self.to_writer(&mut bwrtr)
     }
 
+    /// Write hash list to a writer
     pub fn to_writer<W: Write>(&self, bwrtr: &mut BufWriter<W>) -> Result<(), TaError> {
         for (name, hash) in &self.name_to_hash_map {
             bwrtr.write_all(format!("{} {}\n", hash.to_hex(), name).as_bytes())?;
@@ -62,14 +64,19 @@ impl HashList {
         Ok(())
     }
 
+    /// Create a new empty hash list
+    #[must_use]
     pub fn new() -> Self {
         Self { name_to_hash_map: HashMap::new() }
     }
 
-    pub fn get_hash<'a>(&'a self, filename: &str) -> Option<&'a Sha256Hash> {
+    /// Get the hash for a given filename
+    #[must_use]
+    pub fn get_hash(&self, filename: &str) -> Option<&Sha256Hash> {
         self.name_to_hash_map.get(filename)
     }
 
+    /// Add or update an entry in the hash list
     pub fn add_entry(&mut self, filename: &str, hash: &Sha256Hash) {
         self.name_to_hash_map.insert(filename.to_owned(), hash.clone());
     }

@@ -44,7 +44,7 @@ impl Drop for TestDir {
 #[case(
     r#"
 [test_assets.packages]
-filename = "packages.txt"
+filepath = "packages.txt"
 hash = "e70ee73a8fa703ef0e47c8224b4275db2f951249b883a9f9e30d4ac8e9a676eb"
 url = "https://downloads.openwrt.org/releases/23.05.0/packages/x86_64/base/Packages"
 "#,
@@ -54,12 +54,12 @@ url = "https://downloads.openwrt.org/releases/23.05.0/packages/x86_64/base/Packa
 #[case(
     r#"
 [test_assets.packages1]
-filename = "packages1.txt"
+filepath = "packages1.txt"
 hash = "e70ee73a8fa703ef0e47c8224b4275db2f951249b883a9f9e30d4ac8e9a676eb"
 url = "https://downloads.openwrt.org/releases/23.05.0/packages/x86_64/base/Packages"
 
 [test_assets.packages2]
-filename = "packages2.txt"
+filepath = "packages2.txt"
 hash = "e70ee73a8fa703ef0e47c8224b4275db2f951249b883a9f9e30d4ac8e9a676eb"
 url = "https://downloads.openwrt.org/releases/23.05.0/packages/x86_64/base/Packages"
 "#,
@@ -69,7 +69,7 @@ url = "https://downloads.openwrt.org/releases/23.05.0/packages/x86_64/base/Packa
 #[case(
     r#"
 [test_assets.bad]
-filename = "packages.txt"
+filepath = "packages.txt"
 hash = "0000000000000000000000000000000000000000000000000000000000000000"
 url = "https://downloads.openwrt.org/releases/23.05.0/packages/x86_64/base/Packages"
 "#,
@@ -89,7 +89,7 @@ fn test_binary_downloads(
     drop(file);
 
     let output = Command::new(get_dl_binary())
-        .args(&[test_dir.toml_path().to_str().unwrap(), test_dir.path_str()])
+        .args([test_dir.toml_path().to_str().unwrap(), test_dir.path_str()])
         .output()
         .expect("Failed to execute binary");
 
@@ -118,7 +118,7 @@ fn test_binary_cached_download() {
 
     let toml_content = r#"
 [test_assets.cached]
-filename = "packages.txt"
+filepath = "packages.txt"
 hash = "e70ee73a8fa703ef0e47c8224b4275db2f951249b883a9f9e30d4ac8e9a676eb"
 url = "https://downloads.openwrt.org/releases/23.05.0/packages/x86_64/base/Packages"
 "#;
@@ -128,22 +128,151 @@ url = "https://downloads.openwrt.org/releases/23.05.0/packages/x86_64/base/Packa
     drop(file);
 
     let output1 = Command::new(get_dl_binary())
-        .args(&[test_dir.toml_path().to_str().unwrap(), test_dir.path_str()])
+        .args([test_dir.toml_path().to_str().unwrap(), test_dir.path_str()])
         .output()
         .expect("Failed to execute binary");
 
     assert!(output1.status.success(), "First run failed");
 
     let output2 = Command::new(get_dl_binary())
-        .args(&[test_dir.toml_path().to_str().unwrap(), test_dir.path_str()])
+        .args([test_dir.toml_path().to_str().unwrap(), test_dir.path_str()])
         .output()
         .expect("Failed to execute binary");
 
     assert!(output2.status.success(), "Second run failed");
+}
 
-    let stdout = String::from_utf8_lossy(&output2.stdout);
+#[test]
+fn test_binary_assets_filter_single() {
+    let test_dir = TestDir::new("binary-assets-filter-single");
+
+    let toml_content = r#"
+[test_assets.packages1]
+filepath = "packages1.txt"
+hash = "e70ee73a8fa703ef0e47c8224b4275db2f951249b883a9f9e30d4ac8e9a676eb"
+url = "https://downloads.openwrt.org/releases/23.05.0/packages/x86_64/base/Packages"
+
+[test_assets.packages2]
+filepath = "packages2.txt"
+hash = "e70ee73a8fa703ef0e47c8224b4275db2f951249b883a9f9e30d4ac8e9a676eb"
+url = "https://downloads.openwrt.org/releases/23.05.0/packages/x86_64/base/Packages"
+"#;
+
+    let mut file = fs::File::create(test_dir.toml_path()).unwrap();
+    file.write_all(toml_content.as_bytes()).unwrap();
+    drop(file);
+
+    let output = Command::new(get_dl_binary())
+        .args([
+            test_dir.toml_path().to_str().unwrap(),
+            test_dir.path_str(),
+            "--assets",
+            "packages1",
+        ])
+        .output()
+        .expect("Failed to execute binary");
+
+    assert!(output.status.success(), "Binary failed: {}", String::from_utf8_lossy(&output.stderr));
+
     assert!(
-        stdout.contains("matching hash") || stdout.contains("skipping"),
-        "Expected cache hit message in output"
+        test_dir.file_path("packages1.txt").exists(),
+        "Expected file packages1.txt does not exist"
+    );
+    assert!(
+        !test_dir.file_path("packages2.txt").exists(),
+        "Unexpected file packages2.txt exists (should be filtered out)"
+    );
+}
+
+#[test]
+fn test_binary_assets_filter_multiple() {
+    let test_dir = TestDir::new("binary-assets-filter-multiple");
+
+    let toml_content = r#"
+[test_assets.packages1]
+filepath = "packages1.txt"
+hash = "e70ee73a8fa703ef0e47c8224b4275db2f951249b883a9f9e30d4ac8e9a676eb"
+url = "https://downloads.openwrt.org/releases/23.05.0/packages/x86_64/base/Packages"
+
+[test_assets.packages2]
+filepath = "packages2.txt"
+hash = "e70ee73a8fa703ef0e47c8224b4275db2f951249b883a9f9e30d4ac8e9a676eb"
+url = "https://downloads.openwrt.org/releases/23.05.0/packages/x86_64/base/Packages"
+
+[test_assets.other]
+filepath = "other.txt"
+hash = "e70ee73a8fa703ef0e47c8224b4275db2f951249b883a9f9e30d4ac8e9a676eb"
+url = "https://downloads.openwrt.org/releases/23.05.0/packages/x86_64/base/Packages"
+"#;
+
+    let mut file = fs::File::create(test_dir.toml_path()).unwrap();
+    file.write_all(toml_content.as_bytes()).unwrap();
+    drop(file);
+
+    let output = Command::new(get_dl_binary())
+        .args([
+            test_dir.toml_path().to_str().unwrap(),
+            test_dir.path_str(),
+            "--assets",
+            "packages1,packages2",
+        ])
+        .output()
+        .expect("Failed to execute binary");
+
+    assert!(output.status.success(), "Binary failed: {}", String::from_utf8_lossy(&output.stderr));
+
+    assert!(
+        test_dir.file_path("packages1.txt").exists(),
+        "Expected file packages1.txt does not exist"
+    );
+    assert!(
+        test_dir.file_path("packages2.txt").exists(),
+        "Expected file packages2.txt does not exist"
+    );
+    assert!(
+        !test_dir.file_path("other.txt").exists(),
+        "Unexpected file other.txt exists (should be filtered out)"
+    );
+}
+
+#[test]
+fn test_binary_assets_filter_none() {
+    let test_dir = TestDir::new("binary-assets-filter-none");
+
+    let toml_content = r#"
+[test_assets.packages1]
+filepath = "packages1.txt"
+hash = "e70ee73a8fa703ef0e47c8224b4275db2f951249b883a9f9e30d4ac8e9a676eb"
+url = "https://downloads.openwrt.org/releases/23.05.0/packages/x86_64/base/Packages"
+
+[test_assets.packages2]
+filepath = "packages2.txt"
+hash = "e70ee73a8fa703ef0e47c8224b4275db2f951249b883a9f9e30d4ac8e9a676eb"
+url = "https://downloads.openwrt.org/releases/23.05.0/packages/x86_64/base/Packages"
+"#;
+
+    let mut file = fs::File::create(test_dir.toml_path()).unwrap();
+    file.write_all(toml_content.as_bytes()).unwrap();
+    drop(file);
+
+    let output = Command::new(get_dl_binary())
+        .args([
+            test_dir.toml_path().to_str().unwrap(),
+            test_dir.path_str(),
+            "--assets",
+            "nonexistent",
+        ])
+        .output()
+        .expect("Failed to execute binary");
+
+    assert!(output.status.success(), "Binary failed: {}", String::from_utf8_lossy(&output.stderr));
+
+    assert!(
+        !test_dir.file_path("packages1.txt").exists(),
+        "Unexpected file packages1.txt exists (should be filtered out)"
+    );
+    assert!(
+        !test_dir.file_path("packages2.txt").exists(),
+        "Unexpected file packages2.txt exists (should be filtered out)"
     );
 }

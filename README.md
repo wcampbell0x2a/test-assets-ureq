@@ -23,7 +23,7 @@ test-assets-ureq = "0.5.0"
 For example, add the following information into the project `toml` file.
 ```toml
 [test_assets.test_00]
-filename = "out.squashfs"
+filepath = "out.squashfs"
 hash = "976c1638d8c1ba8014de6c64b196cbd70a5acf031be10a8e7f649536193c8e78"
 url = "https://wcampbell.dev/squashfs/testing/test_00/out.squashfs"
 ```

@@ -37,7 +37,7 @@ impl Drop for TestDir {
 
 fn valid_asset_def(filename: &str) -> TestAssetDef {
     TestAssetDef {
-        filename: filename.to_string(),
+        filepath: filename.to_string(),
         hash: "e70ee73a8fa703ef0e47c8224b4275db2f951249b883a9f9e30d4ac8e9a676eb".to_string(),
         url: "https://downloads.openwrt.org/releases/23.05.0/packages/x86_64/base/Packages"
             .to_string(),
@@ -46,7 +46,7 @@ fn valid_asset_def(filename: &str) -> TestAssetDef {
 
 fn invalid_hash_asset_def(filename: &str) -> TestAssetDef {
     TestAssetDef {
-        filename: filename.to_string(),
+        filepath: filename.to_string(),
         hash: "0000000000000000000000000000000000000000000000000000000000000000".to_string(),
         url: "https://downloads.openwrt.org/releases/23.05.0/packages/x86_64/base/Packages"
             .to_string(),
@@ -65,7 +65,7 @@ fn test_library_download(
     let test_name = format!("library-test-{}", expected_files.join("-").replace(".txt", ""));
     let test_dir = TestDir::new(&test_name);
 
-    let result = dl_test_files(&asset_defs, test_dir.path_str(), !should_succeed);
+    let result = dl_test_files(&asset_defs, test_dir.path_str());
 
     if should_succeed {
         assert!(result.is_ok(), "Failed to download test files: {:?}", result.err());
@@ -79,7 +79,7 @@ fn test_library_download(
         }
 
         // Test that second download also works (cached)
-        let result2 = dl_test_files(&asset_defs, test_dir.path_str(), true);
+        let result2 = dl_test_files(&asset_defs, test_dir.path_str());
         assert!(result2.is_ok(), "Failed on second download attempt");
     } else {
         assert!(result.is_err(), "Expected hash mismatch error");
@@ -92,8 +92,7 @@ fn test_library_download_with_backoff() {
 
     let asset_defs = vec![valid_asset_def("packages.txt")];
 
-    let result =
-        dl_test_files_backoff(&asset_defs, test_dir.path_str(), true, Duration::from_secs(60));
+    let result = dl_test_files_backoff(&asset_defs, test_dir.path_str(), Duration::from_secs(60));
     assert!(result.is_ok(), "Failed to download with backoff: {:?}", result.err());
 
     assert!(test_dir.file_path("packages.txt").exists(), "Downloaded file does not exist");
@@ -103,7 +102,7 @@ fn test_library_download_with_backoff() {
 #[case(
     r#"
 [test_assets.packages]
-filename = "packages.txt"
+filepath = "packages.txt"
 hash = "e70ee73a8fa703ef0e47c8224b4275db2f951249b883a9f9e30d4ac8e9a676eb"
 url = "https://downloads.openwrt.org/releases/23.05.0/packages/x86_64/base/Packages"
 "#,
@@ -113,12 +112,12 @@ url = "https://downloads.openwrt.org/releases/23.05.0/packages/x86_64/base/Packa
 #[case(
     r#"
 [test_assets.packages1]
-filename = "packages1.txt"
+filepath = "packages1.txt"
 hash = "e70ee73a8fa703ef0e47c8224b4275db2f951249b883a9f9e30d4ac8e9a676eb"
 url = "https://downloads.openwrt.org/releases/23.05.0/packages/x86_64/base/Packages"
 
 [test_assets.packages2]
-filename = "packages2.txt"
+filepath = "packages2.txt"
 hash = "e70ee73a8fa703ef0e47c8224b4275db2f951249b883a9f9e30d4ac8e9a676eb"
 url = "https://downloads.openwrt.org/releases/23.05.0/packages/x86_64/base/Packages"
 "#,
@@ -139,7 +138,7 @@ fn test_library_toml_parsing_and_download(
 
     assert_eq!(assets.len(), expected_count, "Should have exactly {} asset(s)", expected_count);
 
-    let result = dl_test_files(&assets, test_dir.path_str(), true);
+    let result = dl_test_files(&assets, test_dir.path_str());
     assert!(result.is_ok(), "Failed to download from TOML definition: {:?}", result.err());
 
     for filename in expected_files {
@@ -158,7 +157,7 @@ fn test_library_toml_from_file() {
 
     let toml_content = r#"
 [test_assets.file_test]
-filename = "packages.txt"
+filepath = "packages.txt"
 hash = "e70ee73a8fa703ef0e47c8224b4275db2f951249b883a9f9e30d4ac8e9a676eb"
 url = "https://downloads.openwrt.org/releases/23.05.0/packages/x86_64/base/Packages"
 "#;
@@ -172,7 +171,7 @@ url = "https://downloads.openwrt.org/releases/23.05.0/packages/x86_64/base/Packa
         toml::de::from_str(&file_content).expect("Failed to parse TOML from file");
     let assets = parsed.values();
 
-    let result = dl_test_files(&assets, test_dir.path_str(), true);
+    let result = dl_test_files(&assets, test_dir.path_str());
     assert!(result.is_ok(), "Failed to download from TOML file: {:?}", result.err());
 
     assert!(test_dir.file_path("packages.txt").exists(), "Downloaded file does not exist");
@@ -185,7 +184,7 @@ fn test_library_toml_with_backoff() {
 
     let toml_content = r#"
 [test_assets.backoff_test]
-filename = "packages.txt"
+filepath = "packages.txt"
 hash = "e70ee73a8fa703ef0e47c8224b4275db2f951249b883a9f9e30d4ac8e9a676eb"
 url = "https://downloads.openwrt.org/releases/23.05.0/packages/x86_64/base/Packages"
 "#;
@@ -193,7 +192,7 @@ url = "https://downloads.openwrt.org/releases/23.05.0/packages/x86_64/base/Packa
     let parsed: TestAsset = toml::de::from_str(toml_content).expect("Failed to parse TOML");
     let assets = parsed.values();
 
-    let result = dl_test_files_backoff(&assets, test_dir.path_str(), true, Duration::from_secs(1));
+    let result = dl_test_files_backoff(&assets, test_dir.path_str(), Duration::from_secs(1));
     assert!(result.is_ok(), "Failed to download from TOML with backoff: {:?}", result.err());
 
     assert!(test_dir.file_path("packages.txt").exists(), "Downloaded file does not exist");
