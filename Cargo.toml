@@ -7,7 +7,7 @@ documentation = "https://docs.rs/test-assets-ureq/"
 repository = "https://github.com/wcampbell0x2a/test-assets-ureq"
 readme = "README.md"
 edition = "2021"
-rust-version = "1.74.1"
+rust-version = "1.82"
 categories = ["development-tools"]
 keywords = ["test", "assets", "download",  "https", "toml"]
 
@@ -18,6 +18,12 @@ ureq = "2.7.1"
 toml = "0.8.19"
 serde = { version = "1.0.215", features = ["derive"] }
 clap = { version = "4.4.18", features = ["derive"] }
+rayon = "1.10"
+indicatif = "0.17"
+console = "0.15"
+
+[dev-dependencies]
+rstest = "0.23"
 
 # Release(dist) binaries are setup for maximum runtime speed, at the cost of CI time
 [profile.dist]
