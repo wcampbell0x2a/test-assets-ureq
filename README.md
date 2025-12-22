@@ -20,7 +20,7 @@ Changes from being a fork of [test-assets](https://github.com/est31/test-assets)
 Add the following to your `Cargo.toml` file:
 ```toml
 [dependencies]
-test-assets-ureq = "0.5.0"
+test-assets-ureq = "0.6.0"
 ```
 
 For example, add the following information into the project `toml` file.
