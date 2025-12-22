@@ -8,8 +8,11 @@
 Download test assets, managing them outside of git.
 
 Changes from being a fork of [test-assets](https://github.com/est31/test-assets):
-* Use rust library `ureq` and avoid compiling curl for test binaries
-* Includes backoff support
+* Use of rust library `ureq` and avoid compiling curl for test binaries
+* backoff support
+* Multi-threaded downloading
+* Library and Binary usage of a `.toml` asset definition file
+* Download binary `dl`
 
 ## Library
 *Compiler support: requires rustc 1.82+*
@@ -37,9 +40,15 @@ dl_test_files_backoff(&assets, "test-assets", true, Duration::from_secs(1)).unwr
 ```
 
 ## Binary
-If test-assets are needed outside of the Rust code, a binary is provided to download them.
-```console
-$ curl -L https://github.com/wcampbell0x2a/test-assets-ureq/releases/download/v0.5.0/dl-v0.5.0-x86_64-unknown-linux-musl.tar.gz -o dl.tar.gz
-$ tar -xvf dl.tar.gz
-$ ./dl test-assets.toml
+If test-assets are needed outside of the Rust code, a binary is provided to download them. See the latest release.
+```console,no_run
+Usage: dl [OPTIONS] <FILE> <PATH>
+
+Arguments:
+  <FILE>  Path to the TOML file to read
+  <PATH>  Base path to write downloaded files
+
+Options:
+      --assets <ASSETS>  List of specific asset names to download (downloads all if not specified)
+  -h, --help             Print help
 ```
