@@ -256,13 +256,17 @@ fn download_test_file(
     }
 
     let filepath = format!("{}/{}", dir, tfile.filepath);
-    if let Some(parent) = std::path::Path::new(&filepath).parent() {
+    let path = std::path::Path::new(&filepath);
+    if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)?;
     }
-    let file = File::create(&filepath)?;
-    let mut writer = io::BufWriter::new(file);
-    writer.write_all(&bytes)?;
-    writer.flush()?;
+    let temp = tempfile::NamedTempFile::new_in(path.parent().unwrap_or(std::path::Path::new(".")))?;
+    {
+        let mut writer = io::BufWriter::new(&temp);
+        writer.write_all(&bytes)?;
+        writer.flush()?;
+    }
+    temp.persist(&filepath).map_err(|e| e.error)?;
 
     let mut hasher = Sha256::new();
     hasher.update(&bytes);
