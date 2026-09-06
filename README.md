@@ -17,10 +17,9 @@ Changes from being a fork of [test-assets](https://github.com/est31/test-assets)
 ## Library
 *Compiler support: requires rustc 1.82+*
 
-Add the following to your `Cargo.toml` file:
-```toml
-[dependencies]
-test-assets-ureq = "0.6.0"
+Add the dependency to your project:
+```sh
+cargo add test-assets-ureq
 ```
 
 For example, add the following information into the project `toml` file.
