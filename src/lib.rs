@@ -109,6 +109,13 @@ impl TestAssetDef {
 #[derive(PartialEq, Eq, Hash, Clone)]
 pub struct Sha256Hash([u8; 32]);
 
+/// Shows the hexadecimal form, because the raw bytes are hard to read.
+impl core::fmt::Debug for Sha256Hash {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "Sha256Hash({})", self.to_hex())
+    }
+}
+
 impl Sha256Hash {
     #[must_use]
     pub fn from_digest(sha: Sha256) -> Self {
