@@ -1,0 +1,99 @@
+name: release-plz
+
+on:
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+
+jobs:
+  # Publish the crate, create the tag, and create the GitHub release.
+  release-plz-release:
+    name: release-plz release
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      # Necessary for crates.io trusted publishing.
+      id-token: write
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@d76c2a93c593483c9892fd8d2538734f73ed8588 # stable
+      - name: Run release-plz
+        uses: release-plz/action@8b5bf233ecb5779f63508db7cd050e948ee77cc2 # v0.5.144
+        id: release-plz
+        with:
+          command: release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # The tag is empty when no release was made.
+      - name: Find the tag
+        id: tag
+        env:
+          RELEASES: ${{ steps.release-plz.outputs.releases }}
+        run: |
+          tag="$(jq -r '.[] | select(.package_name == "test-assets-ureq") | .tag' <<<"${RELEASES:-[]}")"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+  # Open or update the release pull request with the version and changelog changes.
+  release-plz-pr:
+    name: release-plz pr
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      pull-requests: write
+    concurrency:
+      group: release-plz-${{ github.ref }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@d76c2a93c593483c9892fd8d2538734f73ed8588 # stable
+      - name: Run release-plz
+        uses: release-plz/action@8b5bf233ecb5779f63508db7cd050e948ee77cc2 # v0.5.144
+        with:
+          command: release-pr
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Attach the static binary to the release that release-plz created. A tag
+  # that GITHUB_TOKEN pushes does not start other workflows, so binaries.yml
+  # cannot do this.
+  release-assets:
+    name: attach assets
+    needs: release-plz-release
+    if: needs.release-plz-release.outputs.tag != ''
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    env:
+      TAG: ${{ needs.release-plz-release.outputs.tag }}
+      TARGET: x86_64-unknown-linux-musl
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Build the released commit, not the most recent commit on master.
+          ref: ${{ env.TAG }}
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@d76c2a93c593483c9892fd8d2538734f73ed8588 # stable
+        with:
+          target: ${{ env.TARGET }}
+      - run: cargo install cargo-quickinstall
+      - run: cargo quickinstall cross
+      - run: cross build --bin dl --locked --target "$TARGET" --profile=dist
+
+      - name: Attach the binary to the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          asset="dl-$TAG-$TARGET.tar.gz"
+          tar -czf "$asset" -C "target/$TARGET/dist" dl
+          gh release upload "$TAG" "$asset" --clobber --repo "$GITHUB_REPOSITORY"
