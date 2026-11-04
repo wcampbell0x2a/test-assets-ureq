@@ -1,0 +1,9 @@
+# The project has no CHANGELOG.md, so release-plz does not write one.
+[workspace]
+git_tag_enable = true
+git_tag_name = "v{{ version }}"
+git_release_enable = true
+git_release_draft = false
+changelog_update = false
+semver_check = true
+pr_labels = ["release"]
