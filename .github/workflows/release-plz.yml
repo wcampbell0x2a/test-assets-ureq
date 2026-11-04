@@ -29,7 +29,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # Open or update the release pull request with the version change.
+  # Open or update the release pull request with the version and changelog changes.
   release-plz-pr:
     name: release-plz pr
     runs-on: ubuntu-24.04
