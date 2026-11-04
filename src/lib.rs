@@ -56,6 +56,7 @@ mod hash_list;
 
 use backon::BlockingRetryable;
 use backon::ExponentialBuilder;
+use core::sync::atomic::{AtomicU64, Ordering};
 use hash_list::HashList;
 use rayon::prelude::*;
 use serde::Deserialize;
@@ -206,7 +207,9 @@ fn format_bytes(bytes: u64) -> String {
 
 struct DownloadContext<'a> {
     bytes_downloaded: &'a Arc<Mutex<u64>>,
-    total_size: u64,
+    total_size: &'a AtomicU64,
+    /// Size from the HEAD request, if the server gave one
+    head_size: Option<u64>,
     downloading: &'a Arc<Mutex<HashSet<String>>>,
     println_fn: &'a (dyn Fn(&str) + Send + Sync),
     update_progress_fn: &'a (dyn Fn(&str) + Send + Sync),
@@ -227,6 +230,11 @@ fn download_test_file(
     };
 
     let len: usize = resp.header("Content-Length").and_then(|s| s.parse().ok()).unwrap_or(0);
+    if context.head_size.is_none() {
+        // Some servers do not answer HEAD requests (for example, presigned URLs
+        // that allow only GET), so add the size from the GET response.
+        context.total_size.fetch_add(len as u64, Ordering::Relaxed);
+    }
 
     let mut bytes: Vec<u8> = Vec::with_capacity(len);
     let mut reader = resp.into_reader().take(10_000_000_000);
@@ -250,7 +258,7 @@ fn download_test_file(
             (context.update_progress_fn)(&format!(
                 "{} / {} - {}",
                 format_bytes(*downloaded),
-                format_bytes(context.total_size),
+                format_bytes(context.total_size.load(Ordering::Relaxed)),
                 dl.iter().cloned().collect::<Vec<_>>().join(", ")
             ));
         }
@@ -279,6 +287,18 @@ fn download_test_file(
     hasher.update(&bytes);
 
     Ok(DownloadOutcome::WithHash(Sha256Hash::from_digest(hasher)))
+}
+
+/// Returns the Content-Length from a HEAD request, or None if the request fails or gives no size.
+///
+/// A size of 0 gives None: a redirect can answer a HEAD request with `Content-Length: 0`.
+fn head_content_length(url: &str) -> Option<u64> {
+    ureq::agent()
+        .head(url)
+        .call()
+        .ok()
+        .and_then(|resp| resp.header("Content-Length")?.parse().ok())
+        .filter(|&len| len > 0)
 }
 
 /// Downloads the test files into the passed directory with progress callbacks.
@@ -348,18 +368,11 @@ pub fn dl_test_files_with_progress(
         return Ok(());
     }
 
-    let total_size: u64 = files_to_download
-        .iter()
-        .filter_map(|tfile| {
-            let agent = ureq::agent();
-            agent
-                .head(&tfile.url)
-                .call()
-                .ok()
-                .and_then(|resp| resp.header("Content-Length").map(|s| s.to_string()))
-                .and_then(|len| len.parse::<u64>().ok())
-        })
-        .sum();
+    let files_to_download: Vec<_> = files_to_download
+        .into_iter()
+        .map(|tfile| (tfile, head_content_length(&tfile.url)))
+        .collect();
+    let total_size = AtomicU64::new(files_to_download.iter().filter_map(|(_, size)| *size).sum());
 
     let hash_list = Arc::new(Mutex::new(hash_list));
     let downloading = Arc::new(Mutex::new(HashSet::new()));
@@ -369,7 +382,7 @@ pub fn dl_test_files_with_progress(
 
     let results: Vec<_> = files_to_download
         .par_iter()
-        .map(|tfile| {
+        .map(|&(tfile, head_size)| {
             let mut agent = ureq::agent();
             let tfile_hash =
                 Sha256Hash::from_hex(&tfile.hash).map_err(|_| TaError::BadHashFormat)?;
@@ -388,7 +401,8 @@ pub fn dl_test_files_with_progress(
 
             let context = DownloadContext {
                 bytes_downloaded: &bytes_downloaded,
-                total_size,
+                total_size: &total_size,
+                head_size,
                 downloading: &downloading,
                 println_fn: &println_fn,
                 update_progress_fn: &update_progress_fn_local,
